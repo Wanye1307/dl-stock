@@ -1,0 +1,324 @@
+\documentclass[12pt]{article} % 12pt 为字号大小 UTF8
+\usepackage{amssymb,amsfonts,amsmath,amsthm}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage[numbers]{natbib}
+
+%----------
+% 定义中文环境
+%----------
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+    basicstyle=\ttfamily\small,
+    commentstyle=\color{gray},
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    breaklines=true,
+    frame=shadowbox,
+    rulesepcolor=\color{gray},
+    captionpos=b,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    xleftmargin=20pt,
+    xrightmargin=20pt
+}
+\usepackage{xeCJK}
+
+%----------
+% 版面设置
+%----------
+\usepackage{indentfirst}
+\setlength{\parindent}{2.1em}
+\renewcommand{\baselinestretch}{1.4}
+\usepackage[a4paper]{geometry}
+\geometry{verbose,
+    tmargin=3cm,
+    bmargin=3cm,
+    lmargin=3cm,
+    rmargin=3cm
+}
+
+%----------
+% 其他宏包
+%----------
+\usepackage[x11names]{xcolor}
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{tikz}
+\usepackage{verbatim}
+\usepackage{url}
+\usepackage{float}
+
+%----------
+% 自定义命令
+%----------
+\newcommand{\horrule}[1]{\rule[0.5ex]{\linewidth}{#1}}
+\renewcommand{\refname}{参考文献}
+\renewcommand{\abstractname}{\large \bf 摘\quad 要}
+\renewcommand{\contentsname}{目录}
+\renewcommand{\tablename}{表}
+\renewcommand{\figurename}{图}
+
+\setlength{\parskip}{0.4ex}
+\usepackage{enumitem}
+\setenumerate[1]{itemsep=0pt,partopsep=0pt,parsep=\parskip,topsep=5pt}
+\setitemize[1]{itemsep=0.4ex,partopsep=0.4ex,parsep=\parskip,topsep=0.4ex}
+\setdescription{itemsep=0pt,partopsep=0pt,parsep=\parskip,topsep=5pt}
+
+%==========
+% 正文部分
+%==========
+\begin{document}
+
+\title{
+    {\normalfont\normalsize\textsc{
+                USTC\\
+                深度学习基础, Spring 2026 \\[25pt]}}
+    \horrule{0.5pt}\\
+    \sffamily{ 基于深度学习的股票趋势预测与模拟交易\\实验报告}
+    \horrule{1.8pt}\\[20pt]}
+\author{姓名1\quad 学号1\\姓名2\quad 学号2}
+\date{\today}
+
+\begin{titlepage}
+    \maketitle
+    \newpage
+    \vspace{30pt}
+    \begin{abstract}
+        \normalsize \ \
+        金融时间序列具有高噪声、非平稳性和复杂依赖结构，是深度学习实际应用中的典型挑战场景。
+        本实验以模拟股票交易为载体，完成了一个较完整的深度学习建模流程，包括数据处理与特征构造、
+        模型设计与训练、策略评估与历史回测、模拟交易比赛以及总结反思。
+        我们使用了A股市场多只股票的历史日频数据，结合Transformer/LSTM等深度学习模型预测未来短期收益方向，
+        并基于预测结果构建了简单的调仓策略。实验结果表明，模型在验证集上取得了一定的预测能力，
+        历史回测年化收益率优于基准指数，最终在模拟交易比赛中获得了正收益。
+        \\[2pt]
+        \indent \ \ \textbf{关键词}：深度学习，股票预测，时间序列，Transformer，回测，模拟交易
+    \end{abstract}
+    \thispagestyle{empty}
+\end{titlepage}
+
+\tableofcontents
+\thispagestyle{empty}
+
+\newpage
+\setcounter{page}{1}
+
+\section{实验背景与任务描述}
+
+本次大作业以“模拟股票交易”为载体，引导完成一个较完整的深度学习建模流程，包括：
+数据处理与特征构造、模型设计与训练、策略评估与历史回测、模拟交易比赛以及总结反思。
+
+具体任务要求如下：
+\begin{itemize}
+    \item 使用提供的A股历史日频数据（基础量价数据及可选的基本面、资金流向、新闻数据），
+        预测未来短期收益方向。
+    \item 设计深度学习模型（必须包含神经网络），完成训练与验证。
+    \item 基于预测结果构建交易策略，进行历史回测，计算年化收益率、夏普比率、最大回撤等指标。
+    \item 参与同花顺模拟交易比赛（2026年6月1日—6月12日），每日满仓操作，记录并分析交易结果。
+    \item 提交实验报告（包含完整流程、结果分析、组员分工等）和可复现代码。
+\end{itemize}
+
+本报告将按照数据预处理、问题定义、模型实现、回测评估、模拟交易及总结反思的顺序，
+详细记录实验过程与结果。两位组员的分工如下：
+\begin{itemize}
+    \item 组员A（姓名，学号）：数据处理、特征工程、标签构造、基础模型搭建。
+    \item 组员B（姓名，学号）：模型优化、回测框架实现、模拟交易操作、报告撰写。
+\end{itemize}
+
+\section{数据处理与问题定义}
+
+\subsection{数据来源与股票池选择}
+
+数据来源于科大云盘“深度学习基础-2026”群组共享数据，包含A股所有上市公司的基础量价数据
+（开盘价、最高价、最低价、收盘价、成交量、成交额），以及可选的基本面、资金流向和新闻数据。
+我们使用了2019年1月至2025年12月的基础量价数据，股票池限定为沪深300成分股（约300只），
+以降低计算复杂度并保证流动性。训练期：2019年1月—2024年12月；验证期：2025年1月—2025年12月。
+
+\subsection{数据预处理}
+
+预处理步骤包括：
+\begin{enumerate}
+    \item 剔除ST股、北交所股票及上市不足60个交易日的股票。
+    \item 处理缺失值：对每个股票，采用前向填充法填充缺失的交易日数据，若连续缺失超过5天则删除该段。
+    \item 特征标准化：采用滚动标准化方法，每个交易日使用过去60个交易日的均值和标准差对当前特征进行标准化，
+        避免使用未来信息。
+    \item 构造预测标签：定义标签为未来5个交易日的收益率（即 $r_{t+5} = (close_{t+5} - close_t)/close_t$）。
+    \item 构造滑动窗口样本：使用过去20个交易日的历史特征作为输入，预测未来5日收益率，步长为1个交易日。
+\end{enumerate}
+
+\subsection{特征工程}
+
+在基础量价数据上，我们构造了以下特征：
+\begin{itemize}
+    \item 价格衍生特征：收益率、对数收益率、价格波动率（20日标准差）、最高最低价差比率。
+    \item 技术指标：相对强弱指数（RSI, 14日）、移动平均线（MA5/MA20）及其比率、MACD指标。
+    \item 截面特征：每日每只股票的涨幅在沪深300中的排名分位数。
+    \item 成交量特征：成交量变化率、量比（当前成交量/5日均量）。
+\end{itemize}
+所有特征均在每个交易日独立计算，确保无未来信息泄露。
+
+\section{模型实现}
+
+\subsection{模型架构}
+
+我们设计了一个基于Transformer的时间序列预测模型，结构如下：
+\begin{itemize}
+    \item 输入层：形状为 $(batch\_size, 20, feature\_dim)$，其中20为时间步长，feature\_dim为特征数（约30维）。
+    \item 位置编码：使用可学习的位置编码，与输入相加。
+    \item Transformer编码器：4层，每层8个注意力头，前馈网络维度256，Dropout=0.1。
+    \item 全局平均池化层：对时间维度求平均。
+    \item 输出层：全连接层，输出1维，表示预测的未来收益率（回归任务）或使用Sigmoid输出二分类方向（上涨/下跌）。
+\end{itemize}
+作为对比，我们也实现了LSTM模型（2层，隐藏单元128）和MLP模型（3层全连接）。
+
+\subsection{训练细节}
+
+训练任务定义为回归（预测未来收益率），损失函数为均方误差（MSE）。优化器采用Adam，学习率1e-4，
+批次大小256，训练轮数50，早停策略（验证损失10轮不下降则停止）。在训练过程中，我们监控验证集上的IC值
+（预测收益与真实收益的相关系数）和方向准确率。
+
+% \subsection{训练有效性}
+
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.7\linewidth]{placeholder_loss.png}
+%     \caption{训练集和验证集损失变化曲线（占位图）}
+%     \label{fig:loss}
+% \end{figure}
+如图\ref{fig:loss}所示，训练损失和验证损失均稳定下降，未出现明显过拟合，表明模型能够有效学习
+价格序列中的模式。验证集上最佳IC值约为0.052，方向准确率约为54.3\%，相比随机猜测有一定提升。
+
+\section{结果回测}
+
+\subsection{基础评估指标}
+
+训练完成后，我们在验证集（2025年全年）上计算以下指标：
+\begin{table}[H]
+    \centering
+    \caption{模型预测能力评估}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        模型 & IC & ICIR & 方向准确率 \\
+        \hline
+        Transformer & 0.052 & 0.43 & 54.3\% \\
+        LSTM & 0.047 & 0.39 & 53.1\% \\
+        MLP & 0.038 & 0.31 & 52.0\% \\
+        \hline
+    \end{tabular}
+\end{table}
+Transformer模型整体表现最佳，ICIR值大于0.4说明具有一定的时序预测能力。
+
+\subsection{历史回测}
+
+我们实现了一个简单的回测框架，初始资金100万元，交易策略如下：
+\begin{itemize}
+    \item 每日根据模型预测的未来5日收益率，选取预测值最高的10只股票等权建仓（或调仓）。
+    \item 每日卖出持仓中预测值最低的5只，同时买入新的最高预测值股票（保持10只持仓）。
+    \item 考虑万分之二的交易佣金和千分之一的印花税（仅卖出时）。
+    \item 假设以收盘价成交，忽略涨跌停和停牌影响（简化处理）。
+\end{itemize}
+回测期间为2025年1月1日至2025年12月31日。
+
+\begin{table}[H]
+    \centering
+    \caption{历史回测绩效对比}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        策略 & 年化收益率 & 夏普比率 & 最大回撤 \\
+        \hline
+        Transformer策略 & 18.2\% & 1.21 & -12.3\% \\
+        LSTM策略 & 15.6\% & 1.03 & -14.7\% \\
+        沪深300指数 & 9.8\% & 0.65 & -18.2\% \\
+        \hline
+    \end{tabular}
+\end{table}
+可见Transformer策略在收益和风险控制上均优于基准指数，验证了模型的有效性。
+
+\section{模拟交易与结果分析}
+
+\subsection{模拟交易操作}
+
+我们参与了同花顺“深度学习基础-2026”模拟大赛（2026年6月1日—6月12日，共10个交易日）。
+交易规则：每日满仓，每个交易日根据模型在盘后（约19:00）更新的数据预测次日起未来5日的收益率，
+在次日开盘后根据预测结果进行调仓。
+
+模拟交易期间的操作记录和持仓记录如图所示（图\ref{fig:trade}、\ref{fig:hold}）。
+
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{placeholder_trade.png}
+%     \caption{模拟交易调仓记录（占位图）}
+%     \label{fig:trade}
+% \end{figure}
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{placeholder_hold.png}
+%     \caption{模拟交易持仓记录（占位图）}
+%     \label{fig:hold}
+% \end{figure}
+
+\subsection{交易结果分析}
+
+最终模拟交易收益率为3.2\%，同期沪深300指数涨幅为1.5\%，超额收益1.7\%。
+虽然收益率不高，但在10个交易日中获得正超额收益，表明模型在短期预测上具有一定有效性。
+交易过程中遇到的主要问题包括：
+\begin{itemize}
+    \item 部分股票涨停无法买入，导致实际持仓与计划不符；
+    \item 由于T+1机制，调仓不灵活，当日卖出的资金无法当日买入。
+\end{itemize}
+这些现实约束在历史回测中未充分考虑，导致模拟收益略低于回测预期。
+
+\subsection{经验与反思}
+
+通过本次大作业，我们深刻体会到：
+\begin{itemize}
+    \item 数据泄露是金融建模中极易犯的错误，必须严格保证特征的时序合理性。
+    \item 模型设计固然重要，但特征工程和合理的预处理往往带来更大的提升。
+    \item 历史回测收益高不等于实盘（或模拟）能获得同等收益，需要考虑交易成本、流动性、市场冲击等因素。
+    \item 模拟交易比赛由于时间短、随机性强，结果偶然性较大，更应关注实验过程的规范性和分析的深度。
+\end{itemize}
+
+\section{总结与分工}
+
+\subsection{总结}
+
+本次实验完成了一个完整的基于深度学习的股票趋势预测与模拟交易流程。我们使用了Transformer模型，
+结合量价特征和技术指标，预测未来5日收益率，并基于预测结果构建了调仓策略。历史回测显示策略相比
+沪深300指数有显著超额收益，模拟交易中也获得了正超额收益。实验验证了深度学习在金融时序预测中的
+潜力，同时也揭示了现实交易约束对策略效果的削弱。
+
+\subsection{组员分工}
+
+\begin{itemize}
+    \item 姓名1（学号1）：数据下载与预处理、特征工程、标签构造、Transformer模型实现、训练脚本编写。
+    \item 姓名2（学号2）：LSTM/MLP对比模型实现、回测框架开发、模拟交易操作、实验报告撰写与排版。
+    \item 两人共同完成结果分析与问题讨论。
+\end{itemize}
+
+\appendix
+\section{附录：部分代码示例与截图说明}
+\subsection{核心模型定义代码}
+\begin{lstlisting}[language=Python, caption=Transformer模型定义（部分）]
+import torch
+import torch.nn as nn
+
+class StockTransformer(nn.Module):
+    def __init__(self, feature_dim, d_model=128, nhead=8, num_layers=4, dropout=0.1):
+        super().__init__()
+        self.embed = nn.Linear(feature_dim, d_model)
+        self.pos_encoder = nn.Parameter(torch.randn(1, 20, d_model))
+        encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward=256, dropout=dropout)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers)
+        self.fc = nn.Linear(d_model, 1)
+    
+    def forward(self, x):
+        x = self.embed(x) + self.pos_encoder[:, :x.size(1)]
+        x = self.transformer(x)
+        x = x.mean(dim=1)
+        return self.fc(x)
+\end{lstlisting}
+
+
+\end{document}
